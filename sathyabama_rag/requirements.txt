@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+tqdm
+langchain
+langchain-community
+sentence-transformers
+weaviate-client
+fastapi
+uvicorn
