@@ -18,14 +18,18 @@ class RAGResponse:
     chunks:   list[RetrievedChunk] = field(default_factory=list)
 
 
-def query(question: str, top_k: int = TOP_K_RESULTS) -> RAGResponse:
+def query(
+    question: str,
+    top_k: int = TOP_K_RESULTS,
+    backend_override: str | None = None,
+) -> RAGResponse:
     """
     Full RAG pipeline:
       1. Retrieve relevant chunks from Weaviate
       2. Generate an answer using the configured LLM
       3. Return answer + unique source URLs
     """
-    chunks = retrieve(question, top_k=top_k)
+    chunks = retrieve(question, top_k=top_k, backend_override=backend_override)
 
     if not chunks:
         return RAGResponse(

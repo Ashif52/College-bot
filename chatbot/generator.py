@@ -28,29 +28,39 @@ def _build_context(chunks: list[RetrievedChunk]) -> str:
     return "\n\n".join(parts)
 
 
-def _build_messages(question: str, chunks: list[RetrievedChunk]) -> list[dict]:
+def _build_messages(
+    question: str,
+    chunks: list[RetrievedChunk],
+    system_prompt: str = SYSTEM_PROMPT,
+) -> list[dict]:
     context = _build_context(chunks)
     user_content = (
         f"Context:\n{context}\n\n"
         f"Question: {question}"
     )
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user",   "content": user_content},
     ]
 
 
-def generate(question: str, chunks: list[RetrievedChunk]) -> str:
+def generate(
+    question: str,
+    chunks: list[RetrievedChunk],
+    system_prompt: str = SYSTEM_PROMPT,
+    max_tokens: int = 1024,
+    temperature: float = 0.2,
+) -> str:
     """
     Generate an answer using the configured LLM provider.
     Raises ValueError if provider is unknown or API key is missing.
     """
-    messages = _build_messages(question, chunks)
+    messages = _build_messages(question, chunks, system_prompt=system_prompt)
 
     if LLM_PROVIDER == "groq":
-        return _generate_groq(messages)
+        return _generate_groq(messages, max_tokens=max_tokens, temperature=temperature)
     elif LLM_PROVIDER == "openai":
-        return _generate_openai(messages)
+        return _generate_openai(messages, max_tokens=max_tokens, temperature=temperature)
     else:
         raise ValueError(
             f"Unknown LLM_PROVIDER='{LLM_PROVIDER}'. "
@@ -59,7 +69,7 @@ def generate(question: str, chunks: list[RetrievedChunk]) -> str:
 
 
 # ── Groq backend (free llama) ──────────────────────────────────────────────────
-def _generate_groq(messages: list[dict]) -> str:
+def _generate_groq(messages: list[dict], max_tokens: int, temperature: float) -> str:
     from groq import Groq
 
     if not GROQ_API_KEY:
@@ -69,14 +79,14 @@ def _generate_groq(messages: list[dict]) -> str:
     response = client.chat.completions.create(
         model=GROQ_MODEL,
         messages=messages,
-        temperature=0.2,
-        max_tokens=1024,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
     return response.choices[0].message.content.strip()
 
 
 # ── OpenAI backend (paid fallback) ────────────────────────────────────────────
-def _generate_openai(messages: list[dict]) -> str:
+def _generate_openai(messages: list[dict], max_tokens: int, temperature: float) -> str:
     from openai import OpenAI
 
     if not OPENAI_API_KEY:
@@ -86,7 +96,7 @@ def _generate_openai(messages: list[dict]) -> str:
     response = client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=messages,
-        temperature=0.2,
-        max_tokens=1024,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
     return response.choices[0].message.content.strip()

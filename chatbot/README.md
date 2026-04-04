@@ -1,137 +1,99 @@
 # Sathyabama Student Enquiry RAG Chatbot
 
-A **Retrieval-Augmented Generation (RAG)** chatbot that answers student questions about Sathyabama Institute of Science and Technology using the scraped website content as its knowledge base.
+RAG chatbot for Sathyabama Institute queries with a switchable vector backend:
 
-## Tech Stack (Zero to Low Cost)
+- `CLOUD_RAG=true` -> Weaviate Cloud
+- `CLOUD_RAG=false` -> Qdrant (local disk by default, hosted if URL is provided)
 
-| Component | Tool | Cost |
-|-----------|------|------|
-| Vector DB | Weaviate Embedded (local) | **FREE** |
-| Embeddings | `all-MiniLM-L6-v2` (sentence-transformers) | **FREE** |
-| LLM (default) | Groq → `llama-3.3-70b-versatile` | **FREE** |
-| LLM (switch) | OpenAI `gpt-4o-mini` | ~$0.001/query |
+## Tech Stack
 
----
-
-## Project Structure
-
-```
-chatbot/
-├── __init__.py
-├── config.py          ← All settings (edit .env to tune)
-├── schema.py          ← Weaviate collection definition
-├── weaviate_client.py ← Embedded / Cloud client factory
-├── ingest.py          ← Data pipeline: clean → chunk → embed → store
-├── retriever.py       ← Semantic search in Weaviate
-├── generator.py       ← LLM answer generation (Groq / OpenAI)
-├── pipeline.py        ← Orchestrator: retrieve → generate
-├── api.py             ← FastAPI router (mounted in main.py)
-└── cli.py             ← Interactive terminal REPL
-```
-
----
+| Component | Tool |
+|---|---|
+| Vector DB | Weaviate Cloud / Qdrant |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
+| LLM | Groq (`llama-3.3-70b-versatile`) or OpenAI (`gpt-4o-mini`) |
+| API | FastAPI |
 
 ## Setup
 
-### 1. Install dependencies
+1) Install deps
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Environment variables
-All settings live in `.env`. The important ones for the chatbot:
+2) Configure `.env`
+
 ```env
-LLM_PROVIDER=groq          # Change to "openai" to switch LLM
+# LLM
+LLM_PROVIDER=groq
 GROQ_MODEL=llama-3.3-70b-versatile
-WEAVIATE_MODE=embedded     # Uses local storage, no server needed
+
+# Vector backend switch
+CLOUD_RAG=true
+
+# Weaviate Cloud (used when CLOUD_RAG=true)
+WEAVIATE_URL=https://<your-cluster>.weaviate.cloud
+WEAVIATE_API_KEY=<your-weaviate-key>
+
+# Qdrant (used when CLOUD_RAG=false)
+# Local (default if QDRANT_URL is empty)
+QDRANT_LOCAL_PATH=./chatbot/qdrant_data
+# Hosted (optional)
+QDRANT_URL=
+QDRANT_API_KEY=
+QDRANT_COLLECTION_NAME=SathyabamaPage
+
+# Voicebot (Phase 2)
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_NUMBER=
+DEEPGRAM_API_KEY=
+VOICE_PUBLIC_BASE_URL=https://<public-domain-or-ngrok>
+VOICE_DEFAULT_COUNTRY_CODE=+91
 ```
 
-### 3. Run ingestion (one-time setup)
+3) Ingest data
+
 ```bash
 python -m chatbot.ingest
 ```
-This will:
-- Load `sathyabama_rag/data/pages.json`
-- Clean the navigation boilerplate
-- Split into ~500-word chunks
-- Embed with `all-MiniLM-L6-v2`
-- Store in local Weaviate at `chatbot/weaviate_data/`
 
-To force re-ingest:
+Force re-ingest:
+
 ```bash
 python -m chatbot.ingest --force
 ```
 
----
+## Run API
 
-## Usage
-
-### Option A – Interactive CLI
-```bash
-python -m chatbot.cli
-```
-Example:
-```
-You: What is the eligibility for MCA admission?
-Bot: Searching knowledge base...
-Bot: Candidates must have a Bachelor's degree in any discipline...
-Sources:
-  • https://www.sathyabama.ac.in/admissions/post-graduate
-```
-
-### Option B – FastAPI (via main.py)
 ```bash
 uvicorn main:app --reload
 ```
-Endpoints available at `http://localhost:8000`:
-- `POST /chatbot/chat` — Ask a question
-- `GET  /chatbot/health` — Check LLM provider
-- `GET  /docs` — Swagger UI with all endpoints
 
-Example request:
-```bash
-curl -X POST http://localhost:8000/chatbot/chat \
-  -H "Content-Type: application/json" \
-  -d "{\"question\": \"Does the college provide hostel facilities?\"}"
+Or use the helper script from the repo root to start the API, start `ngrok`, and sync `.env` automatically:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-public-api.ps1
 ```
 
-Example response:
-```json
-{
-  "question": "Does the college provide hostel facilities?",
-  "answer": "Yes, Sathyabama provides excellent hostel facilities...",
-  "sources": ["https://www.sathyabama.ac.in/campus-life/hostel-facility"],
-  "provider": "groq",
-  "model": "llama-3.3-70b-versatile"
-}
+For a single-terminal workflow with live logs, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-public-api-live.ps1
 ```
 
----
+This keeps `uvicorn` and `ngrok` attached to the terminal and shuts both down when you press `Ctrl+C`.
+If ngrok is installed but not on PATH, set `NGROK_PATH` to the full `ngrok.exe` path before running the script.
 
-## Switching LLM Provider
+Useful endpoints:
 
-**No code change needed** — just edit `.env`:
+- `POST /chatbot/chat`
+- `GET /chatbot/health` (includes active `vector_db`)
+- `GET /docs`
 
-```env
-# Free (default) — uses Groq's llama
-LLM_PROVIDER=groq
-GROQ_MODEL=llama-3.3-70b-versatile
+## Notes
 
-# Paid fallback — uses OpenAI
-LLM_PROVIDER=openai
-OPENAI_MODEL=gpt-4o-mini
-```
+- Weaviate mode stores data in your cloud cluster.
+- Qdrant local mode stores vectors under `chatbot/qdrant_data/`.
 
----
-
-## Benchmark Questions to Test
-1. *What is the eligibility for MCA admission?*
-2. *What is the fee for the MCA course?*
-3. *Does the college provide hostel facilities?*
-4. *What sports facilities are available?*
-5. *How can I apply for admission?*
-
----
-
-## Weaviate Data
-Vector embeddings are stored locally in `chatbot/weaviate_data/`. Delete this folder and re-run ingest if you want to start fresh.

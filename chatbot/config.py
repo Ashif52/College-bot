@@ -9,11 +9,32 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _as_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
 # ── Vector DB ──────────────────────────────────────────────────────────────────
 WEAVIATE_MODE          = os.getenv("WEAVIATE_MODE", "embedded")          # "embedded" | "cloud"
 WEAVIATE_URL           = os.getenv("WEAVIATE_URL", "kvl1ezdushmhtf6ymyeuqg.c0.asia-southeast1.gcp.weaviate.cloud")
 WEAVIATE_API_KEY       = os.getenv("WEAVIATE_API_KEY", "TlRhWG5neGU2NGJ6eUtJR184RlNKWmJjU1BlMGVjNldyZ1BiT1QzUm9vazR6YktkTFlzditoMW9ieDVjPV92MjAw")
 WEAVIATE_DATA_PATH     = os.getenv("WEAVIATE_DATA_PATH", "./chatbot/weaviate_data")
+
+# Cloud RAG switch:
+#   True  -> use Weaviate Cloud (existing flow)
+#   False -> use Qdrant
+CLOUD_RAG              = _as_bool(os.getenv("CLOUD_RAG", os.getenv("cloud_rag")), default=True)
+
+# Qdrant settings (used when CLOUD_RAG=False)
+QDRANT_URL             = os.getenv("QDRANT_URL", "")  # if empty, local on-disk Qdrant is used
+QDRANT_API_KEY         = os.getenv("QDRANT_API_KEY", "")
+QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "SathyabamaPage")
+QDRANT_LOCAL_PATH      = os.getenv("QDRANT_LOCAL_PATH", "./chatbot/qdrant_data")
+
+# Voicebot callbacks / dialing defaults
+VOICE_PUBLIC_BASE_URL   = os.getenv("VOICE_PUBLIC_BASE_URL", "")
+VOICE_DEFAULT_COUNTRY_CODE = os.getenv("VOICE_DEFAULT_COUNTRY_CODE", "+91")
 
 # ── Embedding model (local, free) ──────────────────────────────────────────────
 EMBED_MODEL            = "sentence-transformers/all-MiniLM-L6-v2"

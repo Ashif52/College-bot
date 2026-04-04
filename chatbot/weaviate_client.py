@@ -8,6 +8,7 @@ from weaviate.embedded import EmbeddedOptions
 import weaviate.classes.init as wvi
 
 from chatbot.config import (
+    CLOUD_RAG,
     WEAVIATE_MODE,
     WEAVIATE_URL,
     WEAVIATE_API_KEY,
@@ -24,7 +25,10 @@ def get_client() -> weaviate.WeaviateClient:
     if _client is not None and _client.is_connected():
         return _client
 
-    if WEAVIATE_MODE == "cloud":
+    # CLOUD_RAG has priority: this path should always use Weaviate Cloud.
+    use_cloud = CLOUD_RAG or WEAVIATE_MODE == "cloud"
+
+    if use_cloud:
         if not WEAVIATE_URL:
             raise ValueError("WEAVIATE_URL must be set when WEAVIATE_MODE=cloud")
         _client = weaviate.connect_to_weaviate_cloud(

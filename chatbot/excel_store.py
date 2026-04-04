@@ -124,7 +124,7 @@ def save_lead(session) -> None:
             ws.cell(row=row_num, column=col_idx).fill = fill
 
     wb.save(LEADS_FILE)
-    print(f"[excel_store] Saved lead for '{session.student_name}' → {LEADS_FILE}")
+    print(f"[excel_store] Saved lead for '{session.student_name}' -> {LEADS_FILE}")
 
 
 def load_lead(session_id: str) -> Optional[dict]:
@@ -184,3 +184,4 @@ def list_pending_leads() -> list[dict]:
         if lead.get("voicebot_status") == "pending" and lead.get("phone_number"):
             pending.append(lead)
     return pending
+

@@ -1,0 +1,15 @@
+INFO:     127.0.0.1:61527 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61527 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55413 - "GET /chatbot/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64241 - "POST /chatbot/session/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51430 - "POST /chatbot/session/6322000f-1a91-490c-8e1c-86af8ee38145/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57009 - "POST /chatbot/session/6322000f-1a91-490c-8e1c-86af8ee38145/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "POST /chatbot/session/6322000f-1a91-490c-8e1c-86af8ee38145/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58354 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58354 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54625 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54625 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54625 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54625 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59392 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59392 - "GET /openapi.json HTTP/1.1" 200 OK

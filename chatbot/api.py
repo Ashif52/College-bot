@@ -6,16 +6,20 @@
 #   app.include_router(chatbot_router, prefix="/chatbot")
 # ─────────────────────────────────────────────────────────────────────────────
 
-from fastapi import APIRouter, HTTPException
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from chatbot import pipeline
-from chatbot.config import LLM_PROVIDER, GROQ_MODEL, OPENAI_MODEL
+from chatbot.config import CLOUD_RAG, LLM_PROVIDER, GROQ_MODEL, OPENAI_MODEL
 from chatbot import session as session_mgr
 from chatbot.excel_store import save_lead
+from chatbot.voicebot_service import initiate_outbound_call_safe
 
 router = APIRouter(tags=["Chatbot"])
+logger = logging.getLogger(__name__)
 
 
 # ── Request / Response models ──────────────────────────────────────────────────
@@ -65,6 +69,7 @@ def chat(req: ChatRequest) -> ChatResponse:
     try:
         result = pipeline.query(req.question, top_k=req.top_k)
     except Exception as e:
+        logger.exception("RAG pipeline failed for /chat request")
         raise HTTPException(status_code=500, detail=f"RAG pipeline error: {e}")
 
     model_name = GROQ_MODEL if LLM_PROVIDER == "groq" else OPENAI_MODEL
@@ -116,7 +121,7 @@ def send_message(session_id: str, req: MessageRequest) -> MessageResponse:
     response_model=SessionEndResponse,
     summary="End a session, generate follow-up questions, and save to Excel"
 )
-def end_session(session_id: str) -> SessionEndResponse:
+def end_session(session_id: str, background_tasks: BackgroundTasks) -> SessionEndResponse:
     """
     End the chat session:
     1. Generate AI summary + follow-up questions
@@ -135,6 +140,10 @@ def end_session(session_id: str) -> SessionEndResponse:
             excel_saved = True
         except Exception as e:
             print(f"[api] Excel save failed: {e}")
+
+    # Phase 2: trigger outbound voicebot immediately after lead is saved.
+    if excel_saved and sess.phone_number:
+        background_tasks.add_task(initiate_outbound_call_safe, sess.session_id, sess.phone_number)
 
     return SessionEndResponse(
         session_id=sess.session_id,
@@ -171,6 +180,7 @@ def session_status(session_id: str) -> dict:
 def health() -> dict:
     return {
         "status":   "ok",
+        "vector_db": "weaviate_cloud" if CLOUD_RAG else "qdrant",
         "provider": LLM_PROVIDER,
         "model":    GROQ_MODEL if LLM_PROVIDER == "groq" else OPENAI_MODEL,
     }
