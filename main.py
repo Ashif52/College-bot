@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 
 import httpx
 import websockets
@@ -163,6 +164,11 @@ async def websocket_endpoint(twilio_ws: WebSocket):
     status_committed = False
     audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
     process_lock = asyncio.Lock()
+    latest_final_transcript = ""
+    last_processed_transcript = ""
+    last_processed_at = 0.0
+    buffered_transcript = ""
+    buffered_flush_task: asyncio.Task | None = None
 
     async def commit_status(status: str, extra: dict | None = None):
         nonlocal status_committed
@@ -211,18 +217,108 @@ async def websocket_endpoint(twilio_ws: WebSocket):
             await asyncio.sleep(0.8)
             await asyncio.to_thread(hangup_call, conversation.call_sid)
 
+    async def process_final_transcript(transcript: str, source: str):
+        nonlocal last_processed_transcript, last_processed_at
+        cleaned = (transcript or "").strip()
+        if not cleaned:
+            return
+
+        now = asyncio.get_running_loop().time()
+        if cleaned == last_processed_transcript and (now - last_processed_at) < 1.5:
+            return
+
+        print(f"USER ({source}):", cleaned)
+        last_processed_transcript = cleaned
+        last_processed_at = now
+        async with process_lock:
+            await handle_transcript(cleaned)
+
+    def should_buffer_current_mode() -> bool:
+        if not conversation:
+            return False
+        return conversation.mode in {"ANY_QUERY_CONFIRM", "MORE_QUERY_CONFIRM", "QUERY_TEXT"}
+
+    def merge_transcripts(existing: str, new_text: str) -> str:
+        existing = (existing or "").strip()
+        new_text = (new_text or "").strip()
+        if not existing:
+            return new_text
+        if not new_text:
+            return existing
+
+        existing_norm = re.sub(r"\s+", " ", existing).lower()
+        new_norm = re.sub(r"\s+", " ", new_text).lower()
+        if new_norm in existing_norm:
+            return existing
+        if existing_norm in new_norm:
+            return new_text
+
+        existing_words = existing.split()
+        new_words = new_text.split()
+        max_overlap = min(len(existing_words), len(new_words), 6)
+        for overlap in range(max_overlap, 0, -1):
+            existing_tail = [word.lower() for word in existing_words[-overlap:]]
+            new_head = [word.lower() for word in new_words[:overlap]]
+            if existing_tail == new_head:
+                return " ".join(existing_words + new_words[overlap:])
+
+        return f"{existing} {new_text}".strip()
+
+    def cancel_buffered_flush() -> None:
+        nonlocal buffered_flush_task
+        if buffered_flush_task and not buffered_flush_task.done():
+            buffered_flush_task.cancel()
+        buffered_flush_task = None
+
+    async def flush_buffered_transcript(source: str):
+        nonlocal buffered_transcript
+        transcript = buffered_transcript.strip()
+        buffered_transcript = ""
+        if transcript:
+            await process_final_transcript(transcript, source)
+
+    async def schedule_buffered_flush():
+        try:
+            await asyncio.sleep(1.1)
+            await flush_buffered_transcript("buffer_timeout")
+        except asyncio.CancelledError:
+            pass
+
     async def deepgram_receiver(dg_ws):
+        nonlocal latest_final_transcript, buffered_transcript, buffered_flush_task
         async for raw in dg_ws:
             try:
                 msg = json.loads(raw)
                 alt = msg.get("channel", {}).get("alternatives", [{}])[0]
                 transcript = alt.get("transcript", "").strip()
-                is_final = msg.get("speech_final", False)
+                is_final = msg.get("is_final", False)
+                speech_final = msg.get("speech_final", False)
 
                 if transcript and is_final:
-                    print("USER:", transcript)
-                    async with process_lock:
-                        await handle_transcript(transcript)
+                    latest_final_transcript = transcript
+
+                if transcript and is_final and should_buffer_current_mode():
+                    buffered_transcript = merge_transcripts(buffered_transcript, transcript)
+                    if speech_final:
+                        cancel_buffered_flush()
+                        await flush_buffered_transcript("speech_final_buffered")
+                    else:
+                        cancel_buffered_flush()
+                        buffered_flush_task = asyncio.create_task(schedule_buffered_flush())
+                    latest_final_transcript = ""
+                    continue
+
+                if speech_final and latest_final_transcript:
+                    await process_final_transcript(latest_final_transcript, "speech_final")
+                    latest_final_transcript = ""
+                    continue
+
+                # On phone audio, Deepgram may emit a clean final segment without
+                # a later speech_final. Short follow-up answers and short questions
+                # should still move the conversation forward.
+                if transcript and is_final:
+                    await process_final_transcript(transcript, "is_final")
+                    latest_final_transcript = ""
             except Exception as exc:
                 print("DG RECV ERROR:", exc)
 
@@ -291,6 +387,7 @@ async def websocket_endpoint(twilio_ws: WebSocket):
 
             finally:
                 await audio_queue.put(None)
+                cancel_buffered_flush()
                 dg_tasks.cancel()
                 try:
                     await dg_tasks

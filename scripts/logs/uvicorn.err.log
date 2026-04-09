@@ -1,21 +1,12 @@
 INFO:     Will watch for changes in these directories: ['C:\\projects\\aashif\\student-project']
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [24128] using WatchFiles
+INFO:     Started reloader process [17932] using WatchFiles
 C:\projects\aashif\student-project\chatbot\api.py:29: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
   question: str = Field(..., min_length=3, example="What is the MCA eligibility?")
 C:\projects\aashif\student-project\chatbot\api.py:46: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
   message: str = Field(..., min_length=1, example="I want to know about MBA admissions")
-INFO:     Started server process [9736]
+INFO:     Started server process [16608]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-C:\Users\Atheeq\venvs\student-project\Lib\site-packages\fastapi\openapi\utils.py:252: UserWarning: Duplicate Operation ID voice_voice_post for function voice at C:\projects\aashif\student-project\main.py
+C:\Users\Atheeq\venvs\student-project\Lib\site-packages\fastapi\openapi\utils.py:252: UserWarning: Duplicate Operation ID voice_voice_get for function voice at C:\projects\aashif\student-project\main.py
   warnings.warn(message, stacklevel=1)
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|##########| 103/103 [00:00<00:00, 2286.37it/s]
-[1mBertModel LOAD REPORT[0m from: sentence-transformers/all-MiniLM-L6-v2
-Key                     | Status     |  | 
-------------------------+------------+--+-
-embeddings.position_ids | UNEXPECTED |  | 
-
-[3mNotes:
-- UNEXPECTED[3m	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.[0m

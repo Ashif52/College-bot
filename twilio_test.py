@@ -11,3 +11,4 @@ call = client.calls.create(
 )
 
 print(call.sid)
+#powershell -ExecutionPolicy Bypass -File .\scripts\run-public-api-live.ps1           

@@ -86,6 +86,49 @@ NUMBER_WORDS = {
     "ninety": 90,
     "hundred": 100,
 }
+GREETING_PHRASES = {
+    "hello",
+    "hi",
+    "hey",
+    "hello hello",
+    "thanks",
+    "thank you",
+    "ok thanks",
+    "okay thanks",
+}
+QUERY_STARTERS = (
+    "what",
+    "how",
+    "when",
+    "where",
+    "which",
+    "who",
+    "can",
+    "could",
+    "do",
+    "does",
+    "did",
+    "is",
+    "are",
+    "will",
+    "would",
+    "tell",
+    "explain",
+)
+QUERY_FRAGMENT_STARTERS = {
+    "to",
+    "for",
+    "about",
+    "with",
+    "in",
+    "into",
+    "on",
+    "at",
+    "from",
+    "and",
+    "but",
+    "because",
+}
 
 
 def _get_voice_public_base_url() -> str:
@@ -100,6 +143,12 @@ def _get_voice_public_base_url() -> str:
 
 def _clean_spoken_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
+
+
+def _normalized_plain_text(text: str) -> str:
+    lowered = _clean_spoken_text(text).lower()
+    lowered = re.sub(r"[^a-z0-9\s]", " ", lowered)
+    return re.sub(r"\s+", " ", lowered).strip()
 
 
 def _looks_like_garbled_text(text: str) -> bool:
@@ -230,14 +279,65 @@ def _normalize_followup_answer(question: str, answer: str) -> str | None:
 
 def _should_confirm_followup_answer(question: str, raw_answer: str, normalized_answer: str) -> bool:
     question_lower = question.lower()
-    raw_clean = _clean_spoken_text(raw_answer).lower()
-    normalized_clean = _clean_spoken_text(normalized_answer).lower()
+    raw_clean = _normalized_plain_text(raw_answer)
+    normalized_clean = _normalized_plain_text(normalized_answer)
 
     if "qualification" in question_lower or "education" in question_lower:
         return True
     if "percentage" in question_lower or "score" in question_lower or "marks" in question_lower:
         return True
     if raw_clean != normalized_clean:
+        return True
+
+    return False
+
+
+def _is_greeting_or_small_talk(text: str) -> bool:
+    normalized = _normalized_plain_text(text)
+    if not normalized:
+        return False
+    if normalized in GREETING_PHRASES:
+        return True
+
+    tokens = normalized.split()
+    if tokens and all(token in {"hello", "hi", "hey", "thanks", "thank", "you", "ok", "okay"} for token in tokens):
+        return True
+
+    return False
+
+
+def _looks_like_query(text: str) -> bool:
+    cleaned = _clean_spoken_text(text)
+    normalized = _normalized_plain_text(cleaned)
+    if not normalized or _is_greeting_or_small_talk(cleaned):
+        return False
+
+    if parse_yes_no(normalized) != "unknown":
+        return False
+
+    if "?" in cleaned:
+        return True
+
+    tokens = normalized.split()
+    if tokens and tokens[0] in QUERY_STARTERS:
+        return True
+
+    query_patterns = (
+        "tell me about",
+        "can you explain",
+        "do we have",
+        "is there",
+        "what about",
+        "i want to know",
+        "i would like to know",
+    )
+    if any(pattern in normalized for pattern in query_patterns):
+        return True
+
+    if len(tokens) >= 4 and any(
+        keyword in normalized
+        for keyword in ("admission", "admissions", "hostel", "gym", "transport", "course", "fees", "campus")
+    ):
         return True
 
     return False
@@ -250,12 +350,16 @@ def _prepare_query_text(text: str) -> str | None:
 
     if not cleaned or _looks_like_garbled_text(cleaned):
         return None
+    if _is_greeting_or_small_talk(cleaned):
+        return None
 
     if cleaned.lower().endswith((" the", " a", " an", " into", " in the", " on the", " of the", " for the")):
         return None
 
     vague_tokens = {"them", "that", "this", "there"}
     tokens = re.findall(r"[a-zA-Z]+", cleaned.lower())
+    if tokens and tokens[0] in QUERY_FRAGMENT_STARTERS and len(tokens) <= 6:
+        return None
     if tokens and len(tokens) <= 6 and sum(token in vague_tokens for token in tokens) >= 2:
         return None
 
@@ -273,6 +377,9 @@ def _sanitize_voice_answer(answer: str) -> str:
     cleaned = _clean_spoken_text(answer)
     cleaned = re.sub(r"https?://\S+", "", cleaned)
     cleaned = re.sub(r"\(Source:.*?\)", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\[\d+\]", "", cleaned)
+    cleaned = re.sub(r"\b\S+\.docx\b", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\bsource\s*:\s*", "", cleaned, flags=re.I)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
 
     if not cleaned or _looks_like_garbled_text(cleaned):
@@ -283,6 +390,36 @@ def _sanitize_voice_answer(answer: str) -> str:
         cleaned = cleaned[:257].rstrip(",;: ") + "."
 
     return cleaned or VOICE_QUERY_FALLBACK
+
+
+def _build_confirmation_reply(answer: str, variant: int) -> str:
+    normalized_answer = _normalized_plain_text(answer)
+    if normalized_answer in {"yes", "no"}:
+        prompts = [
+            f"I heard {answer}. Is that right?",
+            f"Just confirming, did you say {answer}?",
+            f"Let me confirm that. {answer}. Is that correct?",
+        ]
+        return prompts[variant % len(prompts)]
+
+    prompts = [
+        f"I heard {answer}. Is that right? Say yes if that is correct, or no to repeat it.",
+        f"Just to confirm, did you say {answer}? Please say yes or no.",
+        f"Let me confirm that. {answer}. If I got it right, say yes. Otherwise say no.",
+    ]
+    return prompts[variant % len(prompts)]
+
+
+def _post_followup_prompt() -> str:
+    return "Thank you for your responses. If you have a question, you can ask it now. Otherwise, say no."
+
+
+def _post_query_prompt() -> str:
+    return "If you have another question, you can ask it now. Otherwise, say no to finish the call."
+
+
+def _clarify_query_or_finish_prompt() -> str:
+    return "If you have a question, please ask it now. If not, say no to end the call."
 
 
 def normalize_outbound_phone(raw_phone: str, default_country_code: str = VOICE_DEFAULT_COUNTRY_CODE) -> str:
@@ -504,7 +641,7 @@ class VoiceConversationState:
             return f"{greeting} I have a few brief follow up questions. First question. {question}"
 
         self.mode = "ANY_QUERY_CONFIRM"
-        return f"{greeting} I do not have additional follow up questions. Do you have any query? Please say yes or no."
+        return f"{greeting} I do not have additional follow up questions. If you have a question, you can ask it now. Otherwise, say no."
 
     def handle_transcript(self, transcript: str) -> ConversationStep:
         text = (transcript or "").strip()
@@ -521,9 +658,7 @@ class VoiceConversationState:
                 self.pending_followup_question = question
                 self.pending_followup_answer = normalized_answer
                 self.mode = "CONFIRM_FOLLOWUP_ANSWER"
-                return ConversationStep(
-                    reply=f"I heard {normalized_answer}. Is that correct? Please say yes or no."
-                )
+                return ConversationStep(reply=_build_confirmation_reply(normalized_answer, self.question_index))
 
             self.followup_answers.append({"question": question, "answer": normalized_answer})
             self.question_index += 1
@@ -532,7 +667,7 @@ class VoiceConversationState:
                 return ConversationStep(reply=f"Thank you. Next question. {self.followup_questions[self.question_index]}")
 
             self.mode = "ANY_QUERY_CONFIRM"
-            return ConversationStep(reply="Thank you for your responses. Do you have any question? Please say yes or no.")
+            return ConversationStep(reply=_post_followup_prompt())
 
         if self.mode == "CONFIRM_FOLLOWUP_ANSWER":
             intent = parse_yes_no(text)
@@ -551,9 +686,7 @@ class VoiceConversationState:
                     )
 
                 self.mode = "ANY_QUERY_CONFIRM"
-                return ConversationStep(
-                    reply="Thank you for your responses. Do you have any question? Please say yes or no."
-                )
+                return ConversationStep(reply=_post_followup_prompt())
 
             if intent == "no":
                 question = self.pending_followup_question or self.followup_questions[self.question_index]
@@ -562,7 +695,7 @@ class VoiceConversationState:
                 self.mode = "ASK_FOLLOWUPS"
                 return ConversationStep(reply=f"Okay. Please answer again. {question}")
 
-            return ConversationStep(reply="Please say yes or no.")
+            return ConversationStep(reply="Please say yes if that is correct, or no if you want to repeat it.")
 
         if self.mode in {"ANY_QUERY_CONFIRM", "MORE_QUERY_CONFIRM"}:
             intent = parse_yes_no(text)
@@ -576,7 +709,15 @@ class VoiceConversationState:
                     reply="Thank you for your time. Our admissions team will reach out soon. Goodbye.",
                     should_end=True,
                 )
-            return ConversationStep(reply="Please say yes or no.")
+            if _looks_like_query(text):
+                query_text = _prepare_query_text(text)
+                if query_text:
+                    return ConversationStep(needs_query_answer=True, query_text=query_text)
+
+            if _is_greeting_or_small_talk(text):
+                return ConversationStep(reply=_clarify_query_or_finish_prompt())
+
+            return ConversationStep(reply=_clarify_query_or_finish_prompt())
 
         if self.mode == "QUERY_TEXT":
             query_text = _prepare_query_text(text)
@@ -589,7 +730,7 @@ class VoiceConversationState:
     def register_query_answer(self, query: str, answer: str) -> str:
         self.query_turns.append({"query": query, "answer": answer})
         self.mode = "MORE_QUERY_CONFIRM"
-        return f"{answer} Do you have any other query? Please say yes or no."
+        return f"{answer} {_post_query_prompt()}"
 
     def status_payload(self) -> dict[str, Any]:
         return {

@@ -2,6 +2,7 @@ import unittest
 
 from chatbot.voicebot_service import (
     VoiceConversationState,
+    _looks_like_query,
     _normalize_followup_answer,
     _prepare_query_text,
     _sanitize_voice_answer,
@@ -36,7 +37,10 @@ class VoicebotServiceTests(unittest.TestCase):
 
     def test_query_text_cleanup_and_retry(self):
         self.assertIsNone(_prepare_query_text("Just say do we have them into the"))
+        self.assertIsNone(_prepare_query_text("to sports activities"))
         self.assertEqual(_prepare_query_text("Is there a gym inside the campus?"), "Is there a gym inside the campus")
+        self.assertFalse(_looks_like_query("Hello"))
+        self.assertTrue(_looks_like_query("Do we have transportation facilities"))
 
     def test_sanitize_voice_answer(self):
         answer = (
@@ -65,7 +69,7 @@ class VoicebotServiceTests(unittest.TestCase):
         self.assertEqual(state.mode, "ASK_FOLLOWUPS")
 
         step = state.handle_transcript("BCom")
-        self.assertIn("Is that correct", step.reply)
+        self.assertIn("Say yes", step.reply)
         self.assertEqual(state.mode, "CONFIRM_FOLLOWUP_ANSWER")
 
         step = state.handle_transcript("yes")
@@ -76,16 +80,12 @@ class VoicebotServiceTests(unittest.TestCase):
         self.assertIn("question", step.reply.lower())
         self.assertEqual(state.mode, "ANY_QUERY_CONFIRM")
 
-        step = state.handle_transcript("yes")
-        self.assertEqual(state.mode, "QUERY_TEXT")
-        self.assertIn("one short sentence", step.reply.lower())
-
         step = state.handle_transcript("Hostel facility?")
         self.assertTrue(step.needs_query_answer)
         self.assertEqual(step.query_text, "Hostel facility")
 
         followup = state.register_query_answer("Hostel facility?", "Yes, hostel is available.")
-        self.assertIn("other query", followup)
+        self.assertIn("another question", followup)
         self.assertEqual(state.mode, "MORE_QUERY_CONFIRM")
 
         end_step = state.handle_transcript("no")
@@ -111,6 +111,31 @@ class VoicebotServiceTests(unittest.TestCase):
         step = state.handle_transcript("no")
         self.assertIn("Please answer again", step.reply)
         self.assertEqual(state.mode, "ASK_FOLLOWUPS")
+
+    def test_greeting_is_not_treated_as_query_after_answer(self):
+        lead = {"course_of_interest": "MBA"}
+        state = VoiceConversationState(session_id="s3", lead=lead)
+        state.mode = "MORE_QUERY_CONFIRM"
+
+        step = state.handle_transcript("Hello")
+        self.assertFalse(step.needs_query_answer)
+        self.assertIn("ask it now", step.reply)
+
+    def test_binary_confirmation_phrase_is_shorter(self):
+        lead = {
+            "course_of_interest": "MBA",
+            "followup_q1": "Do you plan to appear for any entrance exams?",
+        }
+        state = VoiceConversationState(
+            session_id="s4",
+            lead=lead,
+            followup_questions=[lead["followup_q1"]],
+        )
+
+        state.opening_prompt()
+        step = state.handle_transcript("No")
+        self.assertIn("If you have a question", step.reply)
+        self.assertEqual(state.followup_answers[0]["answer"], "No")
 
 
 if __name__ == "__main__":
