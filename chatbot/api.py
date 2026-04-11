@@ -9,7 +9,6 @@
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from chatbot import pipeline
@@ -63,9 +62,9 @@ class SessionEndResponse(BaseModel):
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 # ── Legacy RAG endpoint (unchanged) ───────────────────────────────────────────
-@router.post("/chat", response_model=ChatResponse, summary="Ask the Sathyabama chatbot (single-shot RAG)")
+@router.post("/chat", response_model=ChatResponse, summary="Ask the Nexus chatbot (single-shot RAG)")
 def chat(req: ChatRequest) -> ChatResponse:
-    """Ask any question about Sathyabama Institute (no lead capture)."""
+    """Ask any question about Nexus Institute of Technology (no lead capture)."""
     try:
         result = pipeline.query(req.question, top_k=req.top_k)
     except Exception as e:
@@ -76,7 +75,7 @@ def chat(req: ChatRequest) -> ChatResponse:
     return ChatResponse(
         question=result.question,
         answer=result.answer,
-        sources=result.sources,
+        sources=[],
         provider=LLM_PROVIDER,
         model=model_name,
     )

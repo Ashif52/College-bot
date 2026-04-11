@@ -13,6 +13,8 @@ from enum import Enum
 from typing import Optional
 
 from chatbot import pipeline as rag_pipeline
+from chatbot.faq import lookup_faq_answer
+from chatbot.public_text import COLLEGE_NAME
 
 
 class ChatState(str, Enum):
@@ -60,7 +62,7 @@ def create_session() -> ChatSession:
     _sessions[session.session_id] = session
 
     greeting = (
-        "👋 Hello! Welcome to **Sathyabama Institute of Science and Technology**!\n\n"
+        f"👋 Hello! Welcome to **{COLLEGE_NAME}**!\n\n"
         "I'm your virtual admissions assistant. I'm here to help you with any questions "
         "about courses, eligibility, fees, hostel facilities, and more.\n\n"
         "How can I help you today? Feel free to ask anything! 😊"
@@ -161,13 +163,13 @@ def process_message(session_id: str, user_text: str) -> dict:
 def _get_rag_answer(question: str) -> str:
     """Call the RAG pipeline and return the answer string."""
     try:
+        _, fast_answer = lookup_faq_answer(question)
+        if fast_answer:
+            return fast_answer
         result = rag_pipeline.query(question)
         return result.answer
-    except Exception as e:
-        return (
-            f"I'm having trouble searching the knowledge base right now. "
-            f"Please try again or contact admissions at 044-24503150.\n(Error: {e})"
-        )
+    except Exception:
+        return "I'm having trouble searching the knowledge base right now. Please try again or contact admissions."
 
 
 def end_session(session_id: str) -> ChatSession:

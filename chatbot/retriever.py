@@ -35,6 +35,12 @@ def _get_embedder() -> SentenceTransformer:
     return _embedder
 
 
+def prewarm_embedder_and_qdrant() -> None:
+    """Best-effort preload for faster first query latency."""
+    _get_embedder()
+    qdrant_db.get_client()
+
+
 def _retrieve_from_weaviate(query_vec: list[float], top_k: int) -> list[RetrievedChunk]:
     client = get_weaviate_client()
     collection = client.collections.get(COLLECTION_NAME)

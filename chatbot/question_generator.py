@@ -54,7 +54,7 @@ def generate_followup_data(session) -> dict:
     phone = session.phone_number or "(unknown)"
 
     system_prompt = (
-        "You are a professional admissions counsellor at Sathyabama Institute of Science and Technology, Chennai. "
+        "You are a professional admissions counsellor at Nexus Institute of Technology. "
         "Your goal is to collect student details needed for the admissions process — "
         "academic background, course interest, eligibility, and admission mode. "
         "You speak like a helpful government college counsellor, not a salesperson."

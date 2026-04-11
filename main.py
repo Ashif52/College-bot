@@ -3,6 +3,7 @@ import base64
 import json
 import os
 import re
+from contextlib import asynccontextmanager
 
 import httpx
 import websockets
@@ -13,10 +14,14 @@ from fastapi.staticfiles import StaticFiles
 
 from chatbot.api import router as chatbot_router
 from chatbot.excel_store import load_lead
+from chatbot.faq import preload_faq_data
+from chatbot.retriever import prewarm_embedder_and_qdrant
 from chatbot.voicebot_service import (
     VoiceConversationState,
+    VOICE_QUERY_FILLER,
     answer_query_with_qdrant,
     build_voice_twiml,
+    get_fast_path_answer,
     hangup_call,
     initiate_outbound_call,
     mark_voicebot_status,
@@ -25,6 +30,8 @@ from chatbot.voicebot_service import (
 load_dotenv()
 
 DEEPGRAM_KEY = os.getenv("DEEPGRAM_API_KEY")
+DG_ENDPOINTING_MS = int(os.getenv("DG_ENDPOINTING_MS", "220"))
+VOICE_QUERY_BUFFER_FLUSH_SECONDS = float(os.getenv("VOICE_QUERY_BUFFER_FLUSH_SECONDS", "0.45"))
 
 DG_STREAM_URL = (
     "wss://api.deepgram.com/v1/listen"
@@ -33,14 +40,25 @@ DG_STREAM_URL = (
     "&sample_rate=8000"
     "&smart_format=true"
     "&punctuate=true"
-    "&endpointing=300"
+    f"&endpointing={DG_ENDPOINTING_MS}"
     "&interim_results=false"
 )
 
 # Send TTS audio in 640-byte chunks (80ms of mulaw @ 8000Hz)
 TTS_CHUNK_BYTES = 640
 
-app = FastAPI(title="Sathyabama AI Platform")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        await asyncio.to_thread(prewarm_embedder_and_qdrant)
+        await asyncio.to_thread(preload_faq_data)
+    except Exception as exc:
+        print(f"[startup] Prewarm skipped: {exc}")
+    yield
+
+
+app = FastAPI(title="Nexus AI Platform", lifespan=lifespan)
 
 # Mount the RAG chatbot under /chatbot
 app.include_router(chatbot_router, prefix="/chatbot")
@@ -204,6 +222,13 @@ async def websocket_endpoint(twilio_ws: WebSocket):
         step = conversation.handle_transcript(transcript)
 
         if step.needs_query_answer:
+            fast_answer = get_fast_path_answer(step.query_text)
+            if fast_answer:
+                reply = conversation.register_query_answer(step.query_text, fast_answer)
+                await speak(reply)
+                return
+
+            await speak(VOICE_QUERY_FILLER)
             answer = await asyncio.to_thread(answer_query_with_qdrant, step.query_text)
             reply = conversation.register_query_answer(step.query_text, answer)
             await speak(reply)
@@ -279,7 +304,7 @@ async def websocket_endpoint(twilio_ws: WebSocket):
 
     async def schedule_buffered_flush():
         try:
-            await asyncio.sleep(1.1)
+            await asyncio.sleep(VOICE_QUERY_BUFFER_FLUSH_SECONDS)
             await flush_buffered_transcript("buffer_timeout")
         except asyncio.CancelledError:
             pass

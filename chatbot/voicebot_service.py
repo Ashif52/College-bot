@@ -14,14 +14,16 @@ from dotenv import load_dotenv
 
 from chatbot.config import VOICE_DEFAULT_COUNTRY_CODE, VOICE_PUBLIC_BASE_URL
 from chatbot.excel_store import load_lead, update_voicebot_status
+from chatbot.faq import lookup_faq_answer
 from chatbot.generator import generate
+from chatbot.public_text import COLLEGE_NAME, sanitize_public_reply
 from chatbot.retriever import retrieve
 
 
 YES_WORDS = {"yes", "yeah", "yep", "sure", "ok", "okay", "continue", "haan", "ha", "y"}
 NO_WORDS = {"no", "nope", "nah", "stop", "end", "exit", "not now", "n"}
 VOICE_QUERY_SYSTEM_PROMPT = """
-You are a professional admissions voice assistant for Sathyabama Institute.
+You are a professional admissions voice assistant for Nexus Institute of Technology.
 
 Answer only from the provided context.
 Keep the reply short and natural for a phone call:
@@ -38,6 +40,7 @@ VOICE_QUERY_FALLBACK = (
     "I am not able to confirm that right now. "
     "Our admissions team will follow up with you shortly."
 )
+VOICE_QUERY_FILLER = "One moment while I check that."
 VOICE_REPEAT_FOLLOWUP = "Sorry, I did not catch that clearly. Please answer once more."
 VOICE_REPEAT_QUERY = "Please repeat your question in one short sentence."
 COMMON_QUALIFICATION_MAP = {
@@ -374,22 +377,19 @@ def _truncate_to_two_sentences(text: str) -> str:
 
 
 def _sanitize_voice_answer(answer: str) -> str:
-    cleaned = _clean_spoken_text(answer)
-    cleaned = re.sub(r"https?://\S+", "", cleaned)
-    cleaned = re.sub(r"\(Source:.*?\)", "", cleaned, flags=re.I)
-    cleaned = re.sub(r"\[\d+\]", "", cleaned)
+    cleaned = sanitize_public_reply(answer, max_sentences=2, max_chars=260)
     cleaned = re.sub(r"\b\S+\.docx\b", "", cleaned, flags=re.I)
-    cleaned = re.sub(r"\bsource\s*:\s*", "", cleaned, flags=re.I)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
+    cleaned = _clean_spoken_text(cleaned).strip(" -")
 
     if not cleaned or _looks_like_garbled_text(cleaned):
         return VOICE_QUERY_FALLBACK
 
-    cleaned = _truncate_to_two_sentences(cleaned)
-    if len(cleaned) > 260:
-        cleaned = cleaned[:257].rstrip(",;: ") + "."
-
     return cleaned or VOICE_QUERY_FALLBACK
+
+
+def get_fast_path_answer(query_text: str) -> str | None:
+    _, answer = lookup_faq_answer(query_text)
+    return answer
 
 
 def _build_confirmation_reply(answer: str, variant: int) -> str:
@@ -629,11 +629,9 @@ class VoiceConversationState:
     def opening_prompt(self) -> str:
         course = str(self.lead.get("course_of_interest") or "").strip()
         if course:
-            greeting = (
-                f"Hello, this is the Sathyabama admissions assistant calling regarding your {course} enquiry."
-            )
+            greeting = f"Hello, this is the {COLLEGE_NAME} admissions assistant calling regarding your {course} enquiry."
         else:
-            greeting = "Hello, this is the Sathyabama admissions assistant. Thank you for your enquiry."
+            greeting = f"Hello, this is the {COLLEGE_NAME} admissions assistant. Thank you for your enquiry."
 
         if self.followup_questions:
             self.mode = "ASK_FOLLOWUPS"
@@ -747,6 +745,10 @@ class VoiceConversationState:
 
 def answer_query_with_qdrant(query_text: str) -> str:
     try:
+        fast_answer = get_fast_path_answer(query_text)
+        if fast_answer:
+            return _sanitize_voice_answer(fast_answer)
+
         chunks = retrieve(query_text, top_k=4, backend_override="qdrant")
         if not chunks:
             return VOICE_QUERY_FALLBACK

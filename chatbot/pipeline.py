@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from chatbot.retriever import retrieve, RetrievedChunk
 from chatbot.generator import generate
 from chatbot.config import TOP_K_RESULTS
+from chatbot.public_text import sanitize_public_reply
 
 
 @dataclass
@@ -36,14 +37,13 @@ def query(
             question=question,
             answer=(
                 "I'm sorry, I couldn't find relevant information for your question. "
-                "Please contact the admissions office at 044-24503150 or visit "
-                "www.sathyabama.ac.in"
+                "Please contact the admissions office for confirmation."
             ),
             sources=[],
             chunks=[],
         )
 
-    answer = generate(question, chunks)
+    answer = sanitize_public_reply(generate(question, chunks))
 
     # Deduplicated source URLs, preserving relevance order
     seen: set[str] = set()

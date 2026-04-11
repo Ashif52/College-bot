@@ -1,5 +1,7 @@
 import unittest
 
+from chatbot.faq import classify_faq_intent
+from chatbot.public_text import sanitize_public_reply
 from chatbot.voicebot_service import (
     VoiceConversationState,
     _looks_like_query,
@@ -44,13 +46,20 @@ class VoicebotServiceTests(unittest.TestCase):
 
     def test_sanitize_voice_answer(self):
         answer = (
-            "Yes, the campus has sports and fitness facilities including fitness centers. "
+            "Yes, Sathyabama campus has sports and fitness facilities including fitness centers. "
             "You can use them during your studies. (Source: https://example.com/page)"
         )
         cleaned = _sanitize_voice_answer(answer)
         self.assertNotIn("https://", cleaned)
         self.assertIn("Yes,", cleaned)
+        self.assertIn("Nexus Institute of Technology", cleaned)
         self.assertLessEqual(cleaned.count("."), 2)
+
+    def test_public_sanitizer_and_faq_intent(self):
+        cleaned = sanitize_public_reply("Visit www.sathyabama.ac.in for hostel details at Sathyabama Institute.")
+        self.assertNotIn("www.", cleaned)
+        self.assertIn("Nexus Institute of Technology", cleaned)
+        self.assertEqual(classify_faq_intent("Can you tell me about hostel fees?"), "hostel")
 
     def test_followup_then_query_loop(self):
         lead = {
@@ -65,6 +74,7 @@ class VoicebotServiceTests(unittest.TestCase):
         )
 
         opening = state.opening_prompt()
+        self.assertIn("Nexus Institute of Technology", opening)
         self.assertIn("MBA enquiry", opening)
         self.assertEqual(state.mode, "ASK_FOLLOWUPS")
 

@@ -1,0 +1,11 @@
+{
+  "_instructions": [
+    "Add FAQ entries inside hostel, fees, eligibility, and counselling.",
+    "Each entry should contain question, keywords, and answer.",
+    "If a matching entry is found, chat and voice will answer from this file before using RAG."
+  ],
+  "hostel": [],
+  "fees": [],
+  "eligibility": [],
+  "counselling": []
+}

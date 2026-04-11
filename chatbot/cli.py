@@ -13,7 +13,7 @@ from chatbot.config import LLM_PROVIDER, GROQ_MODEL, OPENAI_MODEL
 
 BANNER = """
 ╔══════════════════════════════════════════════════════════════╗
-║       Sathyabama Institute – Student Enquiry Chatbot         ║
+║         Nexus Institute – Student Enquiry Chatbot           ║
 ║  Type your question and press Enter. Type 'quit' to exit.    ║
 ╚══════════════════════════════════════════════════════════════╝
 """
@@ -49,11 +49,6 @@ def run() -> None:
             continue
 
         print(f"Bot: {result.answer}\n")
-
-        if result.sources:
-            print("Sources:")
-            for src in result.sources:
-                print(f"  • {src}")
 
         print()
 

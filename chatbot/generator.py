@@ -24,7 +24,7 @@ def _build_context(chunks: list[RetrievedChunk]) -> str:
     """Format retrieved chunks into a numbered context block."""
     parts = []
     for i, chunk in enumerate(chunks, 1):
-        parts.append(f"[{i}] (Source: {chunk.url})\n{chunk.content}")
+        parts.append(f"[{i}]\n{chunk.content}")
     return "\n\n".join(parts)
 
 
