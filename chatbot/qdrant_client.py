@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Qdrant client helpers for local/cloud usage."""
 
 from typing import Any

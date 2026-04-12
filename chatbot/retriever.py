@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Semantic retrieval over Weaviate Cloud or Qdrant."""
 
 from dataclasses import dataclass

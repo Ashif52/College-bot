@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Ingest pages into the active vector database backend."""
 
 import json

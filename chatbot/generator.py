@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # chatbot/generator.py
 # ─────────────────────────────────────────────────────────────────────────────
 # LLM answer generator.

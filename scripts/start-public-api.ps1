@@ -103,6 +103,33 @@ function Get-HttpsTunnelUrl {
     return $null
 }
 
+function Get-NgrokCommand {
+    param([string]$RepoRoot)
+
+    $candidatePaths = @(
+        (Join-Path $RepoRoot "ngrok.exe"),
+        (Join-Path $RepoRoot "ngrok\ngrok.exe")
+    )
+
+    $envPath = (Get-Item env:NGROK_PATH -ErrorAction SilentlyContinue).Value
+    if ($envPath) {
+        $candidatePaths += $envPath
+    }
+
+    $command = Get-Command ngrok -ErrorAction SilentlyContinue
+    if ($command) {
+        $candidatePaths += $command.Source
+    }
+
+    foreach ($candidate in $candidatePaths | Where-Object { $_ } | Select-Object -Unique) {
+        if (Test-Path $candidate) {
+            return @{ Source = (Resolve-Path $candidate).Path }
+        }
+    }
+
+    return $null
+}
+
 function Upsert-EnvValue {
     param(
         [string]$FilePath,
@@ -180,9 +207,9 @@ if (-not $apiReady) {
     Write-Step "Local API is already responding on port $Port"
 }
 
-$ngrokCommand = Get-Command ngrok -ErrorAction SilentlyContinue
+$ngrokCommand = Get-NgrokCommand -RepoRoot $repoRoot
 if (-not $ngrokCommand) {
-    throw "ngrok is not installed or not on PATH. Install it with `winget install ngrok.ngrok`, then run `ngrok config add-authtoken <token>`."
+    throw "ngrok was not found. Add ngrok.exe to the repo root, set NGROK_PATH to the full ngrok.exe path, or install it with `winget install ngrok.ngrok`, then run `ngrok config add-authtoken <token>`."
 }
 
 Write-Step "Checking ngrok tunnel"

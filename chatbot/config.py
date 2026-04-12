@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # chatbot/config.py
 # ─────────────────────────────────────────────────────────────────────────────
 # Central configuration for the RAG chatbot.

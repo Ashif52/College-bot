@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # chatbot/excel_store.py
 # ─────────────────────────────────────────────────────────────────────────────
 # Save and load student lead data to/from an Excel file (leads.xlsx).

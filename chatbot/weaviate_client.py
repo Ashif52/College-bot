@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # chatbot/weaviate_client.py
 # ─────────────────────────────────────────────────────────────────────────────
 # Singleton Weaviate client factory — supports both Embedded and Cloud modes.

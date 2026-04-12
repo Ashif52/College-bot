@@ -19,9 +19,10 @@ Prerequisites:
 
 - Python 3.11+ or a repo-local `.venv`
 - project dependencies installed
-- `ngrok` installed and authenticated once with:
+- `ngrok` authenticated once with:
 
 ```powershell
-winget install ngrok.ngrok
 ngrok config add-authtoken YOUR_NGROK_TOKEN
 ```
+
+The scripts first look for a bundled `ngrok.exe` in the repo root, then fall back to `NGROK_PATH`, then to `ngrok` on `PATH`.

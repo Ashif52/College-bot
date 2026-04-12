@@ -84,7 +84,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-public-api-live.ps1
 ```
 
 This keeps `uvicorn` and `ngrok` attached to the terminal and shuts both down when you press `Ctrl+C`.
-If ngrok is installed but not on PATH, set `NGROK_PATH` to the full `ngrok.exe` path before running the script.
+The scripts first look for a bundled `ngrok.exe` in the repo root, then fall back to `NGROK_PATH`, then to `ngrok` on `PATH`.
 
 Useful endpoints:
 

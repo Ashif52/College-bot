@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # chatbot/pipeline.py
 # ─────────────────────────────────────────────────────────────────────────────
 # Thin orchestrator: retrieve → generate → return structured result.

@@ -105,17 +105,24 @@ function Get-HttpsTunnelUrl {
 }
 
 function Get-NgrokCommand {
+    param([string]$RepoRoot)
+
+    $candidatePaths = @(
+        (Join-Path $RepoRoot "ngrok.exe"),
+        (Join-Path $RepoRoot "ngrok\ngrok.exe")
+    )
+
     $envPath = (Get-Item env:NGROK_PATH -ErrorAction SilentlyContinue).Value
-    if ($envPath -and (Test-Path $envPath)) {
-        return @{ Source = $envPath }
+    if ($envPath) {
+        $candidatePaths += $envPath
     }
 
     $command = Get-Command ngrok -ErrorAction SilentlyContinue
     if ($command) {
-        return @{ Source = $command.Source }
+        $candidatePaths += $command.Source
     }
 
-    $candidatePaths = @(
+    $candidatePaths += @(
         'C:\Users\Atheeq\Pictures\ngrok.exe',
         'C:\Program Files\ngrok\ngrok.exe',
         'C:\Program Files (x86)\ngrok\ngrok.exe',
@@ -124,9 +131,9 @@ function Get-NgrokCommand {
         "$env:USERPROFILE\AppData\Local\Programs\ngrok\ngrok.exe"
     )
 
-    foreach ($candidate in $candidatePaths) {
+    foreach ($candidate in $candidatePaths | Where-Object { $_ } | Select-Object -Unique) {
         if (Test-Path $candidate) {
-            return @{ Source = $candidate }
+            return @{ Source = (Resolve-Path $candidate).Path }
         }
     }
 
@@ -297,9 +304,9 @@ try {
 
     Wait-ForHttpOk -Url $localHealthUrl -TimeoutSeconds $StartupTimeoutSeconds -Label "Local API" | Out-Null
 
-    $ngrokCommand = Get-NgrokCommand
+    $ngrokCommand = Get-NgrokCommand -RepoRoot $repoRoot
     if (-not $ngrokCommand) {
-        throw "ngrok was not found. Install it with `winget install ngrok.ngrok`, then run `ngrok config add-authtoken <token>`, or set NGROK_PATH to the full ngrok.exe path. This runner also checks C:\Users\Atheeq\Pictures\ngrok.exe."
+        throw "ngrok was not found. Add ngrok.exe to the repo root, set NGROK_PATH to the full ngrok.exe path, or install it with `winget install ngrok.ngrok`, then run `ngrok config add-authtoken <token>`."
     }
 
     Write-Step "Starting ngrok tunnel"
@@ -360,7 +367,6 @@ try {
     Stop-LiveProcess -Handle $ngrokHandle
     Stop-LiveProcess -Handle $uvicornHandle
 }
-
 
 
 

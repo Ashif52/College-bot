@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # chatbot/api.py
 # ─────────────────────────────────────────────────────────────────────────────
 # FastAPI router for the RAG chatbot + session-based lead capture chatbot.

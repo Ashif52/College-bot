@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import base64
 import json
 import os
 import re
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 import websockets
@@ -28,6 +31,9 @@ from chatbot.voicebot_service import (
 )
 
 load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent
+FRONTEND_DIST_DIR = BASE_DIR / "frontend" / "dist"
 
 DEEPGRAM_KEY = os.getenv("DEEPGRAM_API_KEY")
 DG_ENDPOINTING_MS = int(os.getenv("DG_ENDPOINTING_MS", "220"))
@@ -69,7 +75,15 @@ app.mount("/chatbot/static", StaticFiles(directory="chatbot/static"), name="chat
 
 @app.get("/", include_in_schema=False)
 def root():
-    """Redirect root to the chat UI."""
+    """Fallback root when the React frontend has not been built yet."""
+    if FRONTEND_DIST_DIR.exists():
+        return RedirectResponse(url="/index.html")
+    return RedirectResponse(url="/chatbot/static/chat.html")
+
+
+@app.get("/legacy-chat", include_in_schema=False)
+def legacy_chat():
+    """Keep the legacy standalone chat UI available for manual testing."""
     return RedirectResponse(url="/chatbot/static/chat.html")
 
 
@@ -428,3 +442,9 @@ async def websocket_endpoint(twilio_ws: WebSocket):
         if conversation and session_id and not status_committed:
             status = "completed" if conversation.completed else "failed"
             await commit_status(status)
+
+
+if FRONTEND_DIST_DIR.exists():
+    # Mount the production frontend after API and websocket routes so those
+    # endpoints keep working while the website is served from the same app.
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True), name="frontend")

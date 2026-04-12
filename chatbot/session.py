@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # chatbot/session.py
 # ─────────────────────────────────────────────────────────────────────────────
 # Session manager for the college admission chatbot.
