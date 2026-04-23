@@ -1,0 +1,13 @@
+.env
+leads.xlsx
+__pycache__/
+*.pyc
+frontend/node_modules
+frontend/dist
+venv/
+ngrok.exe
+qdrant_data/
+chatbot/qdrant_data/
+sathyabama_rag/
+
+*.mp4

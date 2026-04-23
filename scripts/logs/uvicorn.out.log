@@ -1,0 +1,9 @@
+INFO:     127.0.0.1:61357 - "GET /chatbot/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60532 - "GET /chatbot/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60540 - "GET /chatbot/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50561 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50561 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51562 - "GET /chatbot/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57016 - "GET /make-call/002e35d4-12ba-4d44-8b47-97ccabc98340 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55453 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55453 - "GET /openapi.json HTTP/1.1" 200 OK
