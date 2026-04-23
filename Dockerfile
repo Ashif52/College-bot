@@ -31,7 +31,7 @@ COPY . .
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # Expose the port Railway will use
-EXPOSE $PORT
+EXPOSE 8080
 
 # Start the application using Uvicorn
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
