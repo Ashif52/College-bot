@@ -56,11 +56,18 @@ TTS_CHUNK_BYTES = 640
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        await asyncio.to_thread(prewarm_embedder_and_qdrant)
-        await asyncio.to_thread(preload_faq_data)
-    except Exception as exc:
-        print(f"[startup] Prewarm skipped: {exc}")
+    # Fire-and-forget prewarm so the app starts accepting HTTP immediately.
+    # Railway kills the container if it doesn't respond within the health-check
+    # window (~60 s), and the ML-model download can take longer than that.
+    async def _background_prewarm():
+        try:
+            await asyncio.to_thread(prewarm_embedder_and_qdrant)
+            await asyncio.to_thread(preload_faq_data)
+            print("[startup] Prewarm complete")
+        except Exception as exc:
+            print(f"[startup] Prewarm skipped: {exc}")
+
+    asyncio.create_task(_background_prewarm())
     yield
 
 
@@ -73,7 +80,12 @@ app.include_router(chatbot_router, prefix="/chatbot")
 app.mount("/chatbot/static", StaticFiles(directory="chatbot/static"), name="chatbot_static")
 
 
-# Removed root redirect to allow StaticFiles mount to handle the root path automatically.
+
+@app.get("/health")
+def root_health():
+    """Top-level health check for Railway / load-balancer probes."""
+    return {"status": "ok"}
+
 
 
 
